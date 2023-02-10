@@ -6,10 +6,6 @@ import java.io.File;
 
 public class GeniusStorage extends Storage {
 
-    public static void main(String[] args) {
-
-    }
-
     public static Storage instance() {
         return Storage.getInstance("genius", GeniusStorage::new);
     }
