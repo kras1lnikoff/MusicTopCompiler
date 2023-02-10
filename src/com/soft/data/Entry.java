@@ -4,19 +4,33 @@ import com.soft.util.Browser;
 import org.jsoup.nodes.Document;
 
 import java.io.Serializable;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.HashMap;
+import java.util.Map;
 
 public abstract class Entry implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     protected final String url;
-    protected transient Document document;
+    private transient Document document;
+
+    private final Map<String, Value<?>> values;
 
     public Entry(String url) {
         this.url = url;
+        this.values = new HashMap<>();
+    }
+
+    public abstract String type();
+
+    public abstract Storage storage();
+
+    public void load() {
+        toString();
+    }
+
+    public boolean isLoaded() {
+        return values.values().stream().allMatch(Value::isLoaded);
     }
 
     public String url() {
@@ -31,14 +45,10 @@ public abstract class Entry implements Serializable {
         document = null;
     }
 
-    protected <T> T get(T t, Consumer<T> setter, Function<Document, T> parser) {
-        if (t != null) return t;
-        setter.accept(t = parser.apply(document()));
-        return t;
-    }
-
-    protected <T> void trySet(T t, Supplier<T> supplier, Consumer<T> setter) {
-        if (t == null) setter.accept(supplier.get());
+    protected <T> Value<T> getValue(String name, Parser<T> parser) {
+        Value<T> value = (Value<T>) values.computeIfAbsent(name, s -> new Value<>());
+        value.setParser(parser.toSupplier(this));
+        return value;
     }
 
     @Override

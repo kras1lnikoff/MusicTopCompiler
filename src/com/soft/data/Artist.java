@@ -1,117 +1,67 @@
 package com.soft.data;
 
-import com.soft.util.Browser;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.function.Supplier;
 
-public class Artist extends Entry {
-
-    private String name;
-    private String id;
-
-    private List<Album> albums;
-    private List<Song> songs;
+public abstract class Artist extends Entry {
 
     public Artist(String url) {
         super(url);
     }
 
+    protected abstract String parseName(Document document);
+
+    protected abstract String parseID(Document document);
+
+    protected abstract List<Album> parseAlbums(Document document);
+
+    protected abstract List<Track> parseTracks(Document document);
+
+    @Override
+    public String type() {
+        return "artist";
+    }
+
     @Override
     public String toString() {
-        return name();
+        return getName();
     }
 
-    public String name() {
-        return get(name, this::setName, this::parseName);
+    @Override
+    public boolean isLoaded() {
+        return name().isLoaded();
     }
 
-    public String id() {
-        return get(id, this::setID, this::parseID);
+    public String getName() {
+        return name().get();
     }
 
-    public List<Album> albums() {
-        return get(albums, this::setAlbums, this::parseAlbums);
+    public String getID() {
+        return id().get();
     }
 
-    public List<Song> songs() {
-        return get(songs, this::setSongs, this::parseSongs);
+    public List<Album> getAlbums() {
+        return albums().get();
     }
 
-    public void trySetName(Supplier<String> supplier) {
-        trySet(name, supplier, this::setName);
+    public List<Track> getTracks() {
+        return tracks().get();
     }
 
-    public void trySetID(Supplier<String> supplier) {
-        trySet(id, supplier, this::setID);
+    public Value<String> name() {
+        return getValue("name", this::parseName);
     }
 
-    public void trySetAlbums(Supplier<List<Album>> supplier) {
-        trySet(albums, supplier, this::setAlbums);
+    public Value<String> id() {
+        return getValue("id", this::parseID);
     }
 
-    public void trySetSongs(Supplier<List<Song>> supplier) {
-        trySet(songs, supplier, this::setSongs);
+    public Value<List<Album>> albums() {
+        return getValue("albums", this::parseAlbums);
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setID(String id) {
-        this.id = id;
-    }
-
-    public void setAlbums(List<Album> albums) {
-        this.albums = albums;
-    }
-
-    public void setSongs(List<Song> songs) {
-        this.songs = songs;
-    }
-
-    private String parseName(Document document) {
-        String name = Browser.cutTitle(document, "Lyrics, Songs, and Albums | Genius");
-        return name != null ? name : Browser.cutTitle(document, "| Genius");
-    }
-
-    private String parseID(Document document) {
-        Element e = document.head().selectFirst("meta[content^='/artists/']");
-        return e == null ? "" : e.attr("content").substring("/artists/".length());
-    }
-
-    private List<Album> parseAlbums(Document document) {
-        List<Album> albums = new ArrayList<>();
-        document = Browser.connect("https://genius.com/artists/albums?for_artist_page=" + id());
-        for (Element e : document.body().select("a[href^='/albums']")) {
-            Album album = Storage.getAlbum(e.attr("abs:href"));
-            album.trySetTitle(() -> name() + " - " + e.text().strip());
-            album.trySetArtist(() -> this);
-            albums.add(album);
-        }
-        albums.sort(Comparator.comparing(Album::title));
-        return albums;
-    }
-
-    private List<Song> parseSongs(Document document) {
-        List<Song> songs = new ArrayList<>();
-        String url = "https://genius.com/artists/songs?for_artist_page=" + id();
-        for (int page = 1; ; page++) {
-            document = Browser.connect(url + "&page=" + page);
-            Elements select = document.body().select("span[class='song_title']");
-            if (select.isEmpty()) break;
-            for (Element e : select) {
-                Song song = Storage.getSong(e.parent().parent().attr("abs:href"));
-                song.trySetTitle(() -> (song.isSingle() ? song.artist() : song.album()) + " - " + e.text().strip());
-                songs.add(song);
-            }
-        }
-        songs.sort(Comparator.comparing(Song::title));
-        return songs;
+    public Value<List<Track>> tracks() {
+        return getValue("tracks", this::parseTracks);
     }
 }

@@ -2,17 +2,19 @@ package com.soft.data;
 
 import org.jsoup.nodes.Document;
 
-import java.util.List;
+public abstract class Track extends Entry {
 
-public abstract class Album extends Entry {
-
-    public Album(String url) {
+    public Track(String url) {
         super(url);
     }
 
     protected abstract String parseTitle(Document document);
 
-    protected abstract List<Track> parseTracks(Document document);
+    protected abstract String parseVideo(Document document);
+
+    protected abstract String parseText(Document document);
+
+    protected abstract Album parseAlbum(Document document);
 
     protected abstract Artist parseArtist(Document document);
 
@@ -20,25 +22,33 @@ public abstract class Album extends Entry {
 
     @Override
     public String type() {
-        return "album";
+        return "track";
     }
 
     @Override
     public String toString() {
-        return artist() + " - " + title();
+        return (album().isEmpty() ? artist() : album()) + " - " + title();
     }
 
     @Override
     public boolean isLoaded() {
-        return artist().isLoaded() && title().isLoaded();
+        return album().isLoaded() && (!album().isEmpty() || artist().isLoaded()) && title().isLoaded();
     }
 
     public String getTitle() {
         return title().get();
     }
 
-    public List<Track> getTracks() {
-        return tracks().get();
+    public String getVideo() {
+        return video().get();
+    }
+
+    public String getText() {
+        return text().get();
+    }
+
+    public Album getAlbum() {
+        return album().get();
     }
 
     public Artist getArtist() {
@@ -53,8 +63,16 @@ public abstract class Album extends Entry {
         return getValue("title", this::parseTitle);
     }
 
-    public Value<List<Track>> tracks() {
-        return getValue("tracks", this::parseTracks);
+    public Value<String> video() {
+        return getValue("video", this::parseVideo);
+    }
+
+    public Value<String> text() {
+        return getValue("text", this::parseText);
+    }
+
+    public Value<Album> album() {
+        return getValue("album", this::parseAlbum);
     }
 
     public Value<Artist> artist() {

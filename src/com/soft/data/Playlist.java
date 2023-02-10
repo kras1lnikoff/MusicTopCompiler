@@ -4,9 +4,9 @@ import org.jsoup.nodes.Document;
 
 import java.util.List;
 
-public abstract class Album extends Entry {
+public abstract class Playlist extends Entry {
 
-    public Album(String url) {
+    public Playlist(String url) {
         super(url);
     }
 
@@ -14,23 +14,23 @@ public abstract class Album extends Entry {
 
     protected abstract List<Track> parseTracks(Document document);
 
-    protected abstract Artist parseArtist(Document document);
+    protected abstract User parseUser(Document document);
 
-    protected abstract String parseReleaseDate(Document document);
+    protected abstract String parseUpdateDate(Document document);
 
     @Override
     public String type() {
-        return "album";
+        return "playlist";
     }
 
     @Override
     public String toString() {
-        return artist() + " - " + title();
+        return getTitle();
     }
 
     @Override
     public boolean isLoaded() {
-        return artist().isLoaded() && title().isLoaded();
+        return title().isLoaded();
     }
 
     public String getTitle() {
@@ -41,12 +41,12 @@ public abstract class Album extends Entry {
         return tracks().get();
     }
 
-    public Artist getArtist() {
-        return artist().get();
+    public User getUser() {
+        return user().get();
     }
 
-    public String getReleaseDate() {
-        return releaseDate().get();
+    public String getUpdateDate() {
+        return updateDate().get();
     }
 
     public Value<String> title() {
@@ -57,11 +57,11 @@ public abstract class Album extends Entry {
         return getValue("tracks", this::parseTracks);
     }
 
-    public Value<Artist> artist() {
-        return getValue("artist", this::parseArtist);
+    public Value<User> user() {
+        return getValue("user", this::parseUser);
     }
 
-    public Value<String> releaseDate() {
-        return getValue("releaseDate", this::parseReleaseDate);
+    public Value<String> updateDate() {
+        return getValue("updateDate", this::parseUpdateDate);
     }
 }

@@ -2,113 +2,165 @@ package com.soft.data;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
-public final class Storage implements Serializable {
+public abstract class Storage implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private static Storage INSTANCE;
+    private static final Map<String, Storage> INSTANCES = new HashMap<>();
 
-    private static Storage instance() {
-        return INSTANCE == null ? INSTANCE = new Storage() : INSTANCE;
+    protected static Storage getInstance(String name, Supplier<Storage> newInstance) {
+        return INSTANCES.computeIfAbsent(name, s -> newInstance.get());
     }
 
-    private final Map<String, Song> allSongs = new HashMap<>();
-    private final Map<String, Album> allAlbums = new HashMap<>();
-    private final Map<String, Artist> allArtists = new HashMap<>();
+    private transient final File storedData;
+    private transient boolean init;
 
-    private Storage() {
+    protected Map<String, Track> urlTracks;
+    protected Map<String, Album> urlAlbums;
+    protected Map<String, Artist> urlArtists;
+
+    public Storage(File storedData) {
+        this.storedData = storedData;
+        this.urlTracks = new ConcurrentHashMap<>();
+        this.urlAlbums = new ConcurrentHashMap<>();
+        this.urlArtists = new ConcurrentHashMap<>();
     }
 
-    public static void putSong(Song song) {
-        instance().allSongs.put(song.url(), song);
+    public abstract String baseURL();
+
+    public abstract boolean allowsUsers();
+
+    public abstract User getUser(String url);
+
+    public abstract Playlist getPlaylist(String url);
+
+    public abstract String toUserURL(String name);
+
+    public abstract String toPlaylistURL(String name);
+
+    public abstract String toArtistURL(String name);
+
+    public abstract String toAlbumURL(String name);
+
+    public abstract String toTrackURL(String name);
+
+    protected abstract Track newTrack(String url);
+
+    protected abstract Album newAlbum(String url);
+
+    protected abstract Artist newArtist(String url);
+
+    @Override
+    public String toString() {
+        return baseURL();
     }
 
-    public static void putAlbum(Album album) {
-        instance().allAlbums.put(album.url(), album);
+    public String makeURL(String url) {
+        return this + "/" + url;
     }
 
-    public static void putArtist(Artist artist) {
-        instance().allArtists.put(artist.url(), artist);
+    public File getStoredData() {
+        return storedData;
     }
 
-    public static Song getSong(String url) {
-        return instance().allSongs.computeIfAbsent(url, Song::new);
+    public boolean containsTrack(String url) {
+        return urlTracks.containsKey(url);
     }
 
-    public static Album getAlbum(String url) {
-        return instance().allAlbums.computeIfAbsent(url, Album::new);
+    public boolean containsAlbum(String url) {
+        return urlAlbums.containsKey(url);
     }
 
-    public static Artist getArtist(String url) {
-        return instance().allArtists.computeIfAbsent(url, Artist::new);
+    public boolean containsArtist(String url) {
+        return urlArtists.containsKey(url);
     }
 
-    public static int songsTotal() {
-        return instance().allSongs.size();
+    public void putTrack(Track track) {
+        urlTracks.put(track.url(), track);
     }
 
-    public static int albumsTotal() {
-        return instance().allAlbums.size();
+    public void putAlbum(Album album) {
+        urlAlbums.put(album.url(), album);
     }
 
-    public static int artistsTotal() {
-        return instance().allArtists.size();
+    public void putArtist(Artist artist) {
+        urlArtists.put(artist.url(), artist);
     }
 
-    public static Collection<Song> songs() {
-        return instance().allSongs.values();
+    public Track getTrack(String url) {
+        return urlTracks.computeIfAbsent(url, this::newTrack);
     }
 
-    public static Collection<Album> albums() {
-        return instance().allAlbums.values();
+    public Album getAlbum(String url) {
+        return urlAlbums.computeIfAbsent(url, this::newAlbum);
     }
 
-    public static Collection<Artist> artists() {
-        return instance().allArtists.values();
+    public Artist getArtist(String url) {
+        return urlArtists.computeIfAbsent(url, this::newArtist);
     }
 
-    private static final File STORAGE_DATA = new File("resources/storage.dat");
+    public User getUserByName(String name) {
+        return getUser(toUserURL(name));
+    }
 
-    private static boolean init = false;
+    public Artist getArtistByName(String name) {
+        return getArtist(toArtistURL(name));
+    }
 
-    public static void init() {
+    public Set<Track> tracks() {
+        return new HashSet<>(urlTracks.values());
+    }
+
+    public Set<Album> albums() {
+        return new HashSet<>(urlAlbums.values());
+    }
+
+    public Set<Artist> artists() {
+        return new HashSet<>(urlArtists.values());
+    }
+
+    public void init() {
         if (init) return;
-        Storage.load();
-        Runtime.getRuntime().addShutdownHook(new Thread(Storage::save, "Storage save"));
+        load();
+        Runtime.getRuntime().addShutdownHook(new Thread(this::save));
         init = true;
     }
 
-    public static void load() {
+    public void load() {
         try {
-            loadFrom(Files.newInputStream(STORAGE_DATA.toPath(), StandardOpenOption.CREATE));
+            storedData.createNewFile();
+            loadFrom(Files.newInputStream(storedData.toPath()));
         } catch (IOException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
+            System.err.println("An error occurred while loading data from \"" + storedData + "\"");
         }
     }
 
-    public static void save() {
+    public void save() {
         try {
-            saveTo(Files.newOutputStream(STORAGE_DATA.toPath(), StandardOpenOption.CREATE));
+            storedData.createNewFile();
+            saveTo(Files.newOutputStream(storedData.toPath()));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.err.println("An error occurred while saving data to \"" + storedData + "\"");
         }
     }
 
-    public static void loadFrom(InputStream stream) throws IOException, ClassNotFoundException {
+    public void loadFrom(InputStream stream) throws IOException, ClassNotFoundException {
         if (stream.available() == 0) return;
         ObjectInputStream in = new ObjectInputStream(stream);
-        INSTANCE = (Storage) in.readObject();
+        Storage storage = (Storage) in.readObject();
+        urlTracks = storage.urlTracks;
+        urlAlbums = storage.urlAlbums;
+        urlArtists = storage.urlArtists;
         in.close();
     }
 
-    public static void saveTo(OutputStream stream) throws IOException {
+    public void saveTo(OutputStream stream) throws IOException {
         ObjectOutputStream out = new ObjectOutputStream(stream);
-        out.writeObject(instance());
+        out.writeObject(this);
         out.close();
     }
 }
